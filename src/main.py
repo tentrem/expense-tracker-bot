@@ -6,6 +6,7 @@ from constants import (
     CHOOSING_BUDGET_CATEGORY,
     CHOOSING_CATEGORY,
     CHOOSING_CHART,
+    CHOOSING_DATE,
     CHOOSING_EDIT_FIELD,
     CHOOSING_INPUT_TYPE,
     CHOOSING_ITEM_TO_DELETE,
@@ -17,7 +18,6 @@ from constants import (
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
-    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
 )
 from handlers import (
@@ -29,9 +29,10 @@ from handlers import (
     ask_deleting,
     ask_editing,
     ask_input_type,
-    ask_price,
+    ask_manual_desc,
     ask_settings,
     fallback,
+    handle_date_input,
     handle_deletion,
     handle_edit_field_selection,
     handle_edit_selection,
@@ -41,15 +42,14 @@ from handlers import (
     handle_pagination,
     handle_photo,
     handle_photo_confirm,
+    handle_manual_desc_input,
     handle_quick_add,
     handle_quick_add_confirm,
     handle_settings_choice,
     handle_text_input,
-    handle_text_input_confirm,
     handle_undo_delete,
     handle_unexpected_message,
     help_command,
-    handle_price_input,
     handle_manual_confirm,
     make_list,
     save_budget,
@@ -97,11 +97,16 @@ def main() -> None:
             ],
             CHOOSING_CATEGORY: [
                 CommandHandler("start", start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_price),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_manual_desc),
             ],
             CHOOSING_PRICE: [
                 CommandHandler("start", start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_price_input),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_manual_desc_input),
+            ],
+            CHOOSING_DATE: [
+                CommandHandler("start", start),
+                CommandHandler("cancel", fallback),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input),
             ],
             WAITING_MANUAL_CONFIRM: [
                 CommandHandler("start", start),
@@ -111,10 +116,6 @@ def main() -> None:
             WAITING_TEXT: [
                 CommandHandler("start", start),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input),
-            ],
-            WAITING_TEXT_CONFIRM: [
-                CommandHandler("start", start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input_confirm),
             ],
             WAITING_PHOTO: [
                 CommandHandler("start", start),

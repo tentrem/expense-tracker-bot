@@ -14,6 +14,7 @@ from constants import (
     CHOOSING_BUDGET_CATEGORY,
     CHOOSING_CATEGORY,
     CHOOSING_CHART,
+    CHOOSING_DATE,
     CHOOSING_EDIT_FIELD,
     CHOOSING_INPUT_TYPE,
     CHOOSING_ITEM_TO_DELETE,
@@ -21,6 +22,7 @@ from constants import (
     CHOOSING_PRICE,
     EDITING_AMOUNT,
     EDITING_TEXT,
+    WAITING_MANUAL_CONFIRM,
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
@@ -235,16 +237,10 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data["text_category"] = category
     context.user_data["text_description"] = text
 
-    confirm_msg = (
-        f"<b>Simpan pengeluaran?</b>\n\n"
-        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n"
-        f"<b>Kategori:</b> {category}\n"
-        f"<b>Catatan:</b> {text}\n\n"
-        f"Ketik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal, "
-        f"atau ketik jumlah baru (contoh: '75000'):"
+    await update.message.reply_text(
+        "Masukkan tanggal transaksi (YYYY-MM-DD), kosongkan untuk hari ini:"
     )
-    await update.message.reply_text(confirm_msg, parse_mode="HTML")
-    return WAITING_TEXT_CONFIRM
+    return CHOOSING_DATE
 
 
 async def handle_text_input_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -464,7 +460,7 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return CHOOSING_CATEGORY
 
 
-async def ask_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def ask_manual_desc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     selected_category = update.message.text
     if selected_category not in CATEGORIES:
         return await handle_unexpected_message(update, context)
@@ -472,28 +468,69 @@ async def ask_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["selected_category"] = selected_category
     logger.info(f"Kategori dipilih: {selected_category}")
 
-    await update.message.reply_text("Masukkan jumlah (Rp):")
+    await update.message.reply_text(
+        "Masukkan keterangan, contoh: 'makan siang 20k di warteg'"
+    )
     return CHOOSING_PRICE
 
 
-async def handle_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    price_text = update.message.text.strip()
-    parsed = _parse_amount(price_text)
+async def handle_manual_desc_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip()
+    parsed = _parse_amount(text)
     if parsed is None:
         try:
-            parsed = float(price_text.replace(".", "").replace(",", "."))
+            parsed = float(text.replace(".", "").replace(",", "."))
         except ValueError:
-            await update.message.reply_text("Masukkan jumlah yang valid. ", reply_markup=markup)
+            await update.message.reply_text(
+                "Tidak bisa menemukan jumlah. Coba: 'makan siang 20k'",
+                reply_markup=markup,
+            )
             return CHOOSING_PRICE
 
     category = context.user_data["selected_category"]
     context.user_data["manual_amount"] = parsed
-    context.user_data["manual_description"] = category
+    context.user_data["manual_description"] = text
+
+    await update.message.reply_text(
+        "Masukkan tanggal transaksi (YYYY-MM-DD), kosongkan untuk hari ini:"
+    )
+    return CHOOSING_DATE
+
+
+async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip()
+    if text:
+        try:
+            datetime.datetime.strptime(text, "%Y-%m-%d")
+        except ValueError:
+            await update.message.reply_text(
+                "Format tanggal tidak valid (YYYY-MM-DD). Coba lagi.",
+                reply_markup=markup,
+            )
+            return CHOOSING_DATE
+        context.user_data["manual_date"] = text
+    else:
+        context.user_data["manual_date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    is_text_input = "text_category" in context.user_data
+
+    if is_text_input:
+        category = context.user_data.get("text_category", "Other")
+        amount = context.user_data.get("text_amount")
+        description = context.user_data.get("text_description", "")
+    else:
+        category = context.user_data["selected_category"]
+        amount = context.user_data["manual_amount"]
+        description = context.user_data["manual_description"]
+
+    date = context.user_data["manual_date"]
 
     await update.message.reply_text(
         f"Konfirmasi pengeluaran:\n\n"
         f"<b>Kategori:</b> {category}\n"
-        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n\n"
+        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
+        f"<b>Keterangan:</b> {description}\n"
+        f"<b>Tanggal:</b> {date}\n\n"
         f"Ketik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal, "
         f"atau ketik ulang jumlah untuk mengubah.",
         parse_mode="HTML",
@@ -509,8 +546,20 @@ async def handle_manual_confirm(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Dibatalkan.", reply_markup=markup)
         return CHOOSING
 
-    amount = context.user_data["manual_amount"]
-    category = context.user_data["selected_category"]
+    is_text_input = "text_category" in context.user_data
+
+    if is_text_input:
+        category = context.user_data.get("text_category", "Other")
+        amount = context.user_data.get("text_amount")
+        description = context.user_data.get("text_description", "")
+        date = context.user_data.get("manual_date", datetime.datetime.now().strftime("%Y-%m-%d"))
+        source = "text"
+    else:
+        category = context.user_data["selected_category"]
+        amount = context.user_data["manual_amount"]
+        description = context.user_data["manual_description"]
+        date = context.user_data.get("manual_date", datetime.datetime.now().strftime("%Y-%m-%d"))
+        source = "manual"
 
     if text != "ya":
         parsed = _parse_amount(text)
@@ -528,10 +577,10 @@ async def handle_manual_confirm(update: Update, context: ContextTypes.DEFAULT_TY
         user_id=user_id,
         amount=amount,
         category=category,
-        description=category,
+        description=description,
         merchant=None,
-        date=datetime.datetime.now().strftime("%Y-%m-%d"),
-        source="manual",
+        date=date,
+        source=source,
     )
 
     update_spent(category)
@@ -541,6 +590,8 @@ async def handle_manual_confirm(update: Update, context: ContextTypes.DEFAULT_TY
         f"<b>Tercatat 📌</b>\n\n"
         f"<b>Kategori:</b> {category}\n"
         f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
+        f"<b>Keterangan:</b> {description}\n"
+        f"<b>Tanggal:</b> {date}\n"
         f"<b>ID:</b> {expense_id}",
         parse_mode="HTML",
         reply_markup=markup,
