@@ -345,19 +345,90 @@ def _parse_amount(text: str) -> float | None:
 
 
 def _match_category(text: str) -> str:
-    """Match text to a category based on keywords."""
+    """Match text to a category based on keywords.
+    Scan order matters: longer/more-specific keywords first to avoid false matches
+    (e.g. 'grabfood' before 'grab').
+    """
     text_lower = text.lower()
+
+    # Context-aware: alfamart/indomaret with food context → Food, otherwise Shopping
+    shopping_markers = ["alfamart", "indomaret", "supermarket", "pasar"]
+    food_context = any(w in text_lower for w in ["makan", "nasi", "minum", "jajanan", "cemilan", "snack", "kopi", "teh", "mie", "bakso", "soto"])
+    has_shopping_marker = any(m in text_lower for m in shopping_markers)
+    if has_shopping_marker and not food_context:
+        # Defer: will be caught by Shopping keywords below
+        pass
+
+    # Category keywords — order matters within each category
     keywords = {
-        "Food": ["makan", "minum", "makanan", "minuman", "rumah makan", "kantin", "warung", "resto", "restaurant", "indomaret", "alfamart", "supermarket", "pasar", "delivery", "gofood", "grabfood", "shopeefood"],
-        "Transport": ["gojek", "grab", "ojek", "bus", "kereta", "taxi", "bensin", "bbm", "parkir", "tol", "flight", "pesawat"],
-        "Shopping": ["belanja", "tokopedia", "shopee", "lazada", "blibli", "bukalapak"],
-        "Bills": ["listrik", "air", "internet", "pulsa", "data", "hp", "telpon", "bpjs", "asuransi"],
-        "Entertainment": ["nonton", "game", "hiburan", "spotify", "youtube", "netflix"],
-        "Health": ["obat", "dokter", "rs", "klinik", "apotek", "sehat"],
-        "Education": ["buku", "kursus", "sekolah", "kuliah", "belajar"],
-        "Housing": ["sewa", "kos", "rumah", "gas", "furniture"],
-        "Communication": ["telkom", "indihome", "xl", "telkomsel", "tri"],
+        "Food": [
+            "makanan", "minuman", "rumah makan", "warung makan",
+            "resto", "restaurant", "warteg", "kantin", "warung", "resto",
+            "makan", "minum", "nasi", "mie", "indomie", "bakso", "soto",
+            "gorengan", "jajanan", "cemilan", "snack", "es krim", "coklat",
+            "kopi", "teh", "susu", "roti",
+            "delivery", "gofood", "grabfood", "grab food", "shopeefood",
+            "catering", "cater",
+        ],
+        "Transport": [
+            "kereta api", "pesawat",
+            "gojek", "grab", "ojol", "ojek",
+            "bus", "angkot", "travel", "damri",
+            "taxi", "taksi", "bensin", "bbm",
+            "parkir", "tol", "toll",
+            "motor", "mobil", "service motor", "cuci motor",
+            "flight",
+        ],
+        "Shopping": [
+            "tokopedia", "shopee", "lazada", "blibli", "bukalapak",
+            "alfamart", "indomaret", "alfamidi", "supermarket", "pasar",
+            "baju", "kaos", "celana", "sepatu", "tas",
+            "gadget", "hp", "handphone", "laptop", "elektronik",
+            "skincare", "kosmetik",
+            "furnitur", "furniture", "perabot",
+            "belanja", "mall",
+        ],
+        "Bills": [
+            "listrik", "pln", "air", "pdam",
+            "internet", "wifi", "modem", "router",
+            "pulsa", "data", "hp", "telpon",
+            "bpjs", "asuransi",
+            "tagihan", "iuran", "denda",
+            "cicilan", "kredit", "kpr", "spaylater", "paylater",
+            "dana", "ovo", "gopay", "shopeepay", "qris",
+        ],
+        "Entertainment": [
+            "hiburan", "nonton", "bioskop", "karaoke",
+            "game", "konser", "tiket",
+            "wisata", "liburan", "jalan-jalan",
+            "spotify", "youtube", "netflix",
+        ],
+        "Health": [
+            "dokter", "klinik", "rs ", "rs.", "rumah sakit",
+            "obat", "apotek", "vitamin", "suplemen",
+            "masker", "handsanitizer", "sanitasi",
+            "sehat", "kesehatan",
+        ],
+        "Education": [
+            "sekolah", "kuliah", "universitas",
+            "buku", "kursus", "belajar",
+            "les", "bimbel", "seminar", "workshop",
+        ],
+        "Housing": [
+            "sewa", "kos", "rumah", "gas", "furniture",
+            "cat", "renovasi", "perbaikan", "tukang", "kuli",
+        ],
+        "Communication": [
+            "telkom", "indihome", "telkomsel",
+            "xl", "indosat", "tri", "axis",
+            "modem", "router", "wifi id",
+        ],
+        "Other": [
+            "donasi", "zakat", "infak", "sedekah",
+            "hadiah", "kado",
+        ],
     }
+
     for cat, words in keywords.items():
         for word in words:
             if word in text_lower:
