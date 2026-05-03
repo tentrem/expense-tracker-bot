@@ -117,26 +117,30 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
         amount = _parse_amount(ocr_text)
         category = _match_category(ocr_text)
+        merchant = _detect_merchant(ocr_text)
 
         context.user_data["ocr_amount"] = amount
         context.user_data["ocr_category"] = category
+        context.user_data["ocr_merchant"] = merchant
         context.user_data["ocr_text"] = ocr_text
         context.user_data["ocr_temp_path"] = temp_path
+
+        merchant_line = f"\n<b>Merchant:</b> {merchant}\n" if merchant else ""
 
         if amount is not None:
             confirm_msg = (
                 f"<b>Hasil OCR:</b>\n\n"
                 f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
-                f"<b>Kategori:</b> {category}\n\n"
-                f"<pre>{ocr_text[:300]}</pre>\n\n"
+                f"<b>Kategori:</b> {category}\n"
+                f"{merchant_line}"
                 f"Ketik <b>ya</b> untuk simpan, atau edit jumlah (contoh: '50000'):"
             )
         else:
             confirm_msg = (
                 f"<b>Hasil OCR:</b>\n\n"
                 f"Tidak bisa menentukan jumlah.\n"
-                f"<b>Kategori:</b> {category}\n\n"
-                f"<pre>{ocr_text[:300]}</pre>\n\n"
+                f"<b>Kategori:</b> {category}\n"
+                f"{merchant_line}"
                 f"Ketik jumlah (contoh: '50000'):"
             )
 
@@ -156,6 +160,7 @@ async def handle_photo_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         amount = context.user_data.get("ocr_amount")
         category = context.user_data.get("ocr_category", "Other")
+        merchant = context.user_data.get("ocr_merchant")
         ocr_text = context.user_data.get("ocr_text", "")
         temp_path = context.user_data.get("ocr_temp_path")
 
@@ -179,7 +184,7 @@ async def handle_photo_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
             amount=amount,
             category=category,
             description="Receipt scan",
-            merchant=None,
+            merchant=merchant,
             date=datetime.datetime.now().strftime("%Y-%m-%d"),
             source="ocr",
             receipt_image_path=temp_path,
@@ -358,6 +363,26 @@ def _match_category(text: str) -> str:
             if word in text_lower:
                 return cat
     return "Other"
+
+
+def _detect_merchant(ocr_text: str) -> str:
+    """Detect merchant name from OCR text. Look for known store names in first few lines."""
+    known_merchants = [
+        "indomaret", "alfamart", "alfamidi", "hypermart", "carrefour",
+        "lottemart", "transmart", "hero", "giant", "superindo",
+        "starbucks", "jco", "chatime", "kopi kenangan", "janji jiwa",
+        "mcdonalds", "kfc", "pizza hut", "domino", "burger king",
+        "warteg", "warung makan", "rumah makan", "resto", "cafe",
+        "tokopedia", "shopee", "lazada", "blibli", "bukalapak",
+        "grab", "gojek", "grabfood", "gofood",
+        "apotek k-24", "apotek", "kimia farma", "guardian", "watson",
+        "telkom", "telkomsel", "xl", "indosat", "tri", "axis",
+        "pln", "pdam", "bpjs", "prudential", "manulife",
+    ]
+    for merchant in known_merchants:
+        if merchant in ocr_text.lower():
+            return merchant.title()
+    return None
 
 
 # --- Manual Input: Category Selection ---
