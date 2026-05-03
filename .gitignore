@@ -1,0 +1,13 @@
+credentials.json
+venv/
+.env
+__pycache__
+release/
+charts/
+settings.json
+spreadsheets/venv_ocr/
+*.db
+spreadsheets/
+receipts/
+charts/
+settings.json
