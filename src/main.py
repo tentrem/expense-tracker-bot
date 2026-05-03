@@ -16,6 +16,7 @@ from constants import (
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
+    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
 )
 from handlers import (
@@ -43,6 +44,7 @@ from handlers import (
     handle_quick_add_confirm,
     handle_settings_choice,
     handle_text_input,
+    handle_text_input_confirm,
     handle_unexpected_message,
     make_list,
     save_budget,
@@ -99,6 +101,10 @@ def main() -> None:
             WAITING_TEXT: [
                 CommandHandler("start", start),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input),
+            ],
+            WAITING_TEXT_CONFIRM: [
+                CommandHandler("start", start),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input_confirm),
             ],
             WAITING_PHOTO: [
                 CommandHandler("start", start),

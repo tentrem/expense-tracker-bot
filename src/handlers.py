@@ -225,11 +225,49 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return CHOOSING
 
     category = _match_category(text)
-    description = text
+    context.user_data["text_amount"] = parsed
+    context.user_data["text_category"] = category
+    context.user_data["text_description"] = text
+
+    confirm_msg = (
+        f"<b>Simpan pengeluaran?</b>\n\n"
+        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n"
+        f"<b>Kategori:</b> {category}\n"
+        f"<b>Catatan:</b> {text}\n\n"
+        f"Ketik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal, "
+        f"atau ketik jumlah baru (contoh: '75000'):"
+    )
+    await update.message.reply_text(confirm_msg, parse_mode="HTML")
+    return WAITING_TEXT_CONFIRM
+
+
+async def handle_text_input_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip().lower()
+
+    if text == "cancel" or text == "/cancel":
+        context.user_data.clear()
+        await update.message.reply_text("Dibatalkan.", reply_markup=markup)
+        return CHOOSING
+
+    amount = context.user_data.get("text_amount")
+    category = context.user_data.get("text_category", "Other")
+    description = context.user_data.get("text_description", "")
+
+    if text != "ya":
+        parsed = _parse_amount(text)
+        if parsed is not None:
+            amount = parsed
+        else:
+            try:
+                amount = float(text.replace(".", "").replace(",", "."))
+            except ValueError:
+                await update.message.reply_text("Jumlah tidak valid. Coba lagi.", reply_markup=markup)
+                return CHOOSING
+
     user_id = str(update.effective_user.id)
     expense_id = save_expense(
         user_id=user_id,
-        amount=parsed,
+        amount=amount,
         category=category,
         description=description,
         merchant=None,
@@ -243,12 +281,14 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text(
         f"<b>Tercatat ✅</b>\n\n"
         f"<b>Kategori:</b> {category}\n"
-        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n"
+        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
         f"<b>Catatan:</b> {description}\n"
         f"<b>ID:</b> {expense_id}",
         parse_mode="HTML",
         reply_markup=markup,
     )
+
+    context.user_data.clear()
     return CHOOSING
 
 

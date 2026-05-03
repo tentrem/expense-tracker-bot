@@ -18,8 +18,9 @@ from telegram import ReplyKeyboardMarkup
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
+    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
-) = range(17)
+) = range(18)
 
 DB_PATH = None  # Set from config at runtime
 LOCAL_CHART_PATH = "./charts"
