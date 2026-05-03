@@ -89,7 +89,7 @@ def main() -> None:
                 CommandHandler("start", start),
                 MessageHandler(filters.Regex("^📝 Manual$"), ask_category),
                 MessageHandler(filters.Regex("^📷 Foto$"), handle_input_type),
-                MessageHandler(filters.Regex("^💬 Teks$"), ask_input_type),
+                MessageHandler(filters.Regex("^💬 Teks$"), handle_input_type),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_message),
             ],
             CHOOSING_CATEGORY: [

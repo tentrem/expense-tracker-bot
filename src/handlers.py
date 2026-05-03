@@ -477,38 +477,39 @@ async def ask_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def save_on_local_db(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    try:
-        price_text = update.message.text.replace(".", "").replace(",", ".")
-        price = float(price_text)
-        category = context.user_data["selected_category"]
-        user_id = str(update.effective_user.id)
+    price_text = update.message.text.strip()
+    parsed = _parse_amount(price_text)
+    if parsed is None:
+        try:
+            parsed = float(price_text.replace(".", "").replace(",", "."))
+        except ValueError:
+            await update.message.reply_text("Masukkan jumlah yang valid. 🚨", reply_markup=markup)
+            return CHOOSING_PRICE
 
-        expense_id = save_expense(
-            user_id=user_id,
-            amount=price,
-            category=category,
-            description=category,
-            merchant=None,
-            date=datetime.datetime.now().strftime("%Y-%m-%d"),
-            source="manual",
-        )
+    category = context.user_data["selected_category"]
+    user_id = str(update.effective_user.id)
 
-        update_spent(category)
-        await check_budget(category)
+    expense_id = save_expense(
+        user_id=user_id,
+        amount=parsed,
+        category=category,
+        description=category,
+        merchant=None,
+        date=datetime.datetime.now().strftime("%Y-%m-%d"),
+        source="manual",
+    )
 
-        await update.message.reply_text(
-            f"<b>Tercatat 📌</b>\n\n"
-            f"<b>Kategori:</b> {category}\n"
-            f"<b>Jumlah:</b> Rp {price:,.0f}\n"
-            f"<b>ID:</b> {expense_id}",
-            parse_mode="HTML",
-            reply_markup=markup,
-        )
-    except ValueError:
-        await update.message.reply_text(
-            "Masukkan jumlah yang valid. 🚨", reply_markup=markup
-        )
+    update_spent(category)
+    await check_budget(category)
 
+    await update.message.reply_text(
+        f"<b>Tercatat 📌</b>\n\n"
+        f"<b>Kategori:</b> {category}\n"
+        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n"
+        f"<b>ID:</b> {expense_id}",
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
     return CHOOSING
 
 
