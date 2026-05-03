@@ -16,6 +16,7 @@ from constants import (
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
+    QUICK_ADD_CONFIRM,
 )
 from handlers import (
     ask_budget,
@@ -38,6 +39,8 @@ from handlers import (
     handle_pagination,
     handle_photo,
     handle_photo_confirm,
+    handle_quick_add,
+    handle_quick_add_confirm,
     handle_settings_choice,
     handle_text_input,
     handle_unexpected_message,
@@ -75,6 +78,7 @@ def main() -> None:
                 MessageHandler(filters.Regex("^Disable Google Sheet sync$"), handle_settings_choice),
                 MessageHandler(filters.Regex("^Enable budget notification$"), handle_settings_choice),
                 MessageHandler(filters.Regex("^Disable budget notification$"), handle_settings_choice),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quick_add),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_message),
             ],
             CHOOSING_INPUT_TYPE: [
@@ -112,6 +116,10 @@ def main() -> None:
                 ),
                 MessageHandler(filters.Regex("^(⬅️ Previous|➡️ Next)$"), handle_pagination),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_message),
+            ],
+            QUICK_ADD_CONFIRM: [
+                CommandHandler("start", start),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quick_add_confirm),
             ],
             CHOOSING_CHART: [
                 CommandHandler("start", start),

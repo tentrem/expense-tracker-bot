@@ -24,6 +24,7 @@ from constants import (
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
+    QUICK_ADD_CONFIRM,
     markup,
     input_type_keyboard,
 )
@@ -817,4 +818,82 @@ async def fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Huh?", reply_markup=markup)
+    return CHOOSING
+
+
+# --- Quick Add (direct text input from main menu) ---
+async def handle_quick_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip()
+    amount = _parse_amount(text)
+    if amount is None:
+        await update.message.reply_text("Huh?", reply_markup=markup)
+        return CHOOSING
+
+    category = _match_category(text)
+    context.user_data["quick_amount"] = amount
+    context.user_data["quick_category"] = category
+    context.user_data["quick_description"] = text
+
+    confirm_msg = (
+        f"<b>Simpan pengeluaran?</b>\n\n"
+        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
+        f"<b>Kategori:</b> {category}\n"
+        f"<b>Catatan:</b> {text}\n\n"
+        f"Ketik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal, "
+        f"atau ketik jumlah baru (contoh: '75000'):"
+    )
+    await update.message.reply_text(confirm_msg, parse_mode="HTML")
+    return QUICK_ADD_CONFIRM
+
+
+async def handle_quick_add_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip().lower()
+    user_id = str(update.effective_user.id)
+
+    if text == "cancel" or text == "/cancel":
+        context.user_data.clear()
+        await update.message.reply_text("Dibatalkan.", reply_markup=markup)
+        return CHOOSING
+
+    amount = context.user_data.get("quick_amount")
+    category = context.user_data.get("quick_category", "Other")
+    description = context.user_data.get("quick_description", "")
+
+    if text == "ya":
+        pass  # use existing amount
+    else:
+        parsed = _parse_amount(text)
+        if parsed is not None:
+            amount = parsed
+        else:
+            try:
+                amount = float(text.replace(".", "").replace(",", "."))
+            except ValueError:
+                await update.message.reply_text("Jumlah tidak valid. Coba lagi.", reply_markup=markup)
+                return CHOOSING
+
+    expense_id = save_expense(
+        user_id=user_id,
+        amount=amount,
+        category=category,
+        description=description,
+        merchant=None,
+        date=datetime.datetime.now().strftime("%Y-%m-%d"),
+        source="quick",
+    )
+
+    update_spent(category)
+    await check_budget(category)
+
+    await update.message.reply_text(
+        f"<b>Tercatat ✅</b>\n\n"
+        f"<b>Kategori:</b> {category}\n"
+        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
+        f"<b>Catatan:</b> {description}\n"
+        f"<b>ID:</b> {expense_id}",
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
+
+    context.user_data.clear()
     return CHOOSING
