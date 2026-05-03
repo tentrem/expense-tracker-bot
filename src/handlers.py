@@ -41,6 +41,7 @@ from utils import (
     get_expenses,
     is_expenses_empty,
     load_settings,
+    restore_expense,
     save_expense,
     save_settings,
     set_budget,
@@ -572,9 +573,30 @@ async def handle_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     deleted = delete_expense(expense_id)
 
     if deleted:
-        await update.message.reply_text("Pengeluaran dihapus. ✅", reply_markup=markup)
+        context.user_data["last_deleted_id"] = expense_id
+        context.user_data["last_deleted_text"] = text
+        undo_kb = ReplyKeyboardMarkup([["↩️ Undo Hapus"]], one_time_keyboard=True, resize_keyboard=True)
+        await update.message.reply_text("Pengeluaran dihapus. ✅", reply_markup=undo_kb)
     else:
         await update.message.reply_text("Gagal menghapus.", reply_markup=markup)
+
+    return CHOOSING
+
+
+async def handle_undo_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    expense_id = context.user_data.get("last_deleted_id")
+    if not expense_id:
+        await update.message.reply_text("Tidak ada yang bisa di-undo.", reply_markup=markup)
+        return CHOOSING
+
+    restored = restore_expense(expense_id)
+    context.user_data.pop("last_deleted_id", None)
+    context.user_data.pop("last_deleted_text", None)
+
+    if restored:
+        await update.message.reply_text("Pengeluaran dikembalikan. ↩️", reply_markup=markup)
+    else:
+        await update.message.reply_text("Gagal mengembalikan.", reply_markup=markup)
 
     return CHOOSING
 

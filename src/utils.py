@@ -180,6 +180,20 @@ def delete_expense(expense_id, user_id=None):
     return deleted
 
 
+def restore_expense(expense_id):
+    """Undo soft delete."""
+    conn = _get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE expenses SET is_deleted = 0, updated_at = ? WHERE id = ?",
+        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), expense_id),
+    )
+    restored = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return restored
+
+
 def update_expense(expense_id, user_id=None, **kwargs):
     allowed = {"amount", "category", "description", "merchant", "date"}
     updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
