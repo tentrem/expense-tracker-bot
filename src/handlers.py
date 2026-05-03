@@ -969,7 +969,19 @@ async def handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return CHOOSING
 
 
-# --- Fallback ---
+# --- Slash Commands ---
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    help_text = (
+        "<b>📋 Daftar Command</b>\n\n"
+        "/start — Mulai tracking pengeluaran\n"
+        "/help — Tampilkan daftar command\n"
+        "/cancel — Batalkan input saat ini\n\n"
+        "<b>💡 Quick-add:</b> ketik langsung dari menu utama\n"
+        "Contoh: <code>makan siang 50k di warung</code>"
+    )
+    await update.message.reply_text(help_text, parse_mode="HTML")
+
+
 async def fallback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     return await start(update, context)

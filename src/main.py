@@ -47,6 +47,7 @@ from handlers import (
     handle_text_input_confirm,
     handle_undo_delete,
     handle_unexpected_message,
+    help_command,
     make_list,
     save_budget,
     save_on_local_db,
@@ -177,6 +178,8 @@ def main() -> None:
     )
 
     application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("cancel", fallback))
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
