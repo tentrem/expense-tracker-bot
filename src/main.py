@@ -13,6 +13,7 @@ from constants import (
     CHOOSING_PRICE,
     EDITING_AMOUNT,
     EDITING_TEXT,
+    WAITING_MANUAL_CONFIRM,
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
@@ -48,9 +49,10 @@ from handlers import (
     handle_undo_delete,
     handle_unexpected_message,
     help_command,
+    handle_price_input,
+    handle_manual_confirm,
     make_list,
     save_budget,
-    save_on_local_db,
     show_budget,
     show_heatmap_chart,
     show_monthly_chart,
@@ -99,7 +101,12 @@ def main() -> None:
             ],
             CHOOSING_PRICE: [
                 CommandHandler("start", start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, save_on_local_db),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_price_input),
+            ],
+            WAITING_MANUAL_CONFIRM: [
+                CommandHandler("start", start),
+                CommandHandler("cancel", fallback),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_manual_confirm),
             ],
             WAITING_TEXT: [
                 CommandHandler("start", start),

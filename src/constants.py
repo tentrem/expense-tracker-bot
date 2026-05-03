@@ -6,6 +6,7 @@ from telegram import ReplyKeyboardMarkup
     CHOOSING_INPUT_TYPE,
     CHOOSING_CATEGORY,
     CHOOSING_PRICE,
+    WAITING_MANUAL_CONFIRM,
     CHOOSING_ITEM_TO_DELETE,
     CHOOSING_CHART,
     CHOOSING_BUDGET,
@@ -20,7 +21,7 @@ from telegram import ReplyKeyboardMarkup
     WAITING_PHOTO_CONFIRM,
     WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
-) = range(18)
+) = range(19)
 
 DB_PATH = None  # Set from config at runtime
 LOCAL_CHART_PATH = "./charts"

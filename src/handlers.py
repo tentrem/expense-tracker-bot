@@ -476,22 +476,57 @@ async def ask_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CHOOSING_PRICE
 
 
-async def save_on_local_db(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def handle_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     price_text = update.message.text.strip()
     parsed = _parse_amount(price_text)
     if parsed is None:
         try:
             parsed = float(price_text.replace(".", "").replace(",", "."))
         except ValueError:
-            await update.message.reply_text("Masukkan jumlah yang valid. 🚨", reply_markup=markup)
+            await update.message.reply_text("Masukkan jumlah yang valid. ", reply_markup=markup)
             return CHOOSING_PRICE
 
     category = context.user_data["selected_category"]
-    user_id = str(update.effective_user.id)
+    context.user_data["manual_amount"] = parsed
+    context.user_data["manual_description"] = category
 
+    await update.message.reply_text(
+        f"Konfirmasi pengeluaran:\n\n"
+        f"<b>Kategori:</b> {category}\n"
+        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n\n"
+        f"Ketik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal, "
+        f"atau ketik ulang jumlah untuk mengubah.",
+        parse_mode="HTML",
+    )
+    return WAITING_MANUAL_CONFIRM
+
+
+async def handle_manual_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip()
+
+    if text == "cancel" or text == "/cancel":
+        context.user_data.clear()
+        await update.message.reply_text("Dibatalkan.", reply_markup=markup)
+        return CHOOSING
+
+    amount = context.user_data["manual_amount"]
+    category = context.user_data["selected_category"]
+
+    if text != "ya":
+        parsed = _parse_amount(text)
+        if parsed is not None:
+            amount = parsed
+        else:
+            try:
+                amount = float(text.replace(".", "").replace(",", "."))
+            except ValueError:
+                await update.message.reply_text("Jumlah tidak valid. Coba lagi.", reply_markup=markup)
+                return WAITING_MANUAL_CONFIRM
+
+    user_id = str(update.effective_user.id)
     expense_id = save_expense(
         user_id=user_id,
-        amount=parsed,
+        amount=amount,
         category=category,
         description=category,
         merchant=None,
@@ -505,11 +540,13 @@ async def save_on_local_db(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(
         f"<b>Tercatat 📌</b>\n\n"
         f"<b>Kategori:</b> {category}\n"
-        f"<b>Jumlah:</b> Rp {parsed:,.0f}\n"
+        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
         f"<b>ID:</b> {expense_id}",
         parse_mode="HTML",
         reply_markup=markup,
     )
+
+    context.user_data.clear()
     return CHOOSING
 
 
