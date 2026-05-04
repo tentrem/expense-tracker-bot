@@ -902,6 +902,13 @@ def _get_expenses_df():
     df = pd.DataFrame(expenses)
     df["amount"] = df["amount"].astype(float)
     df["date"] = pd.to_datetime(df["date"])
+
+    # Filter: 3 bulan terakhir
+    now = datetime.datetime.now()
+    first_of_month = now.replace(day=1)
+    cutoff = first_of_month - pd.DateOffset(months=2)
+    df = df[df["date"] >= cutoff]
+
     return df
 
 
@@ -914,9 +921,10 @@ async def show_yearly_chart(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await save_pie_chart(df, "charts/expense_by_category_by_year.png")
     await update.message.reply_photo(
         open("charts/expense_by_category_by_year.png", "rb"),
-        caption="Pengeluaran per kategori (tahunan)",
+        caption="Pengeluaran per kategori (3 bulan terakhir)",
         reply_markup=markup,
     )
+    os.remove("charts/expense_by_category_by_year.png")
     return CHOOSING
 
 
@@ -929,9 +937,10 @@ async def show_trend_chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await save_trend_chart(df, "charts/expense_trend_top_categories_by_month.png")
     await update.message.reply_photo(
         open("charts/expense_trend_top_categories_by_month.png", "rb"),
-        caption="Trend 3 kategori teratas (bulanan)",
+        caption="Trend 3 kategori teratas (3 bulan terakhir)",
         reply_markup=markup,
     )
+    os.remove("charts/expense_trend_top_categories_by_month.png")
     return CHOOSING
 
 
@@ -944,9 +953,10 @@ async def show_monthly_chart(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await save_stacked_bar_chart(df, "charts/monthly_expenses_by_category.png")
     await update.message.reply_photo(
         open("charts/monthly_expenses_by_category.png", "rb"),
-        caption="Pengeluaran per kategori (bulanan)",
+        caption="Pengeluaran per kategori (3 bulan terakhir)",
         reply_markup=markup,
     )
+    os.remove("charts/monthly_expenses_by_category.png")
     return CHOOSING
 
 
@@ -959,9 +969,10 @@ async def show_heatmap_chart(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await save_heatmap(df, "charts/heatmap_expense_intensity.png")
     await update.message.reply_photo(
         open("charts/heatmap_expense_intensity.png", "rb"),
-        caption="Intensitas pengeluaran (bulanan)",
+        caption="Intensitas pengeluaran (3 bulan terakhir)",
         reply_markup=markup,
     )
+    os.remove("charts/heatmap_expense_intensity.png")
     return CHOOSING
 
 

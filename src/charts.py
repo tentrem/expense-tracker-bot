@@ -70,10 +70,12 @@ async def save_heatmap(df, filename):
     heatmap_data = df.pivot_table(
         values="amount", index="category", columns="Month", aggfunc="sum", fill_value=0
     )
-    existing_months = [
-        month for month in calendar.month_name[1:] if month in heatmap_data.columns
-    ]
+
+    # Sort columns chronologically (pivot_table returns alphabetical by default)
+    month_order = list(calendar.month_name[1:])
+    existing_months = [m for m in month_order if m in heatmap_data.columns]
     heatmap_data = heatmap_data[existing_months]
+
     plt.figure(figsize=(12, 8))
     sns.heatmap(heatmap_data, fmt=".0f", annot=True, cmap="YlGnBu")
     plt.tight_layout()
