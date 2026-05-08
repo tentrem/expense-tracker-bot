@@ -17,13 +17,11 @@ from telegram import ReplyKeyboardMarkup
     CHOOSING_EDIT_FIELD,
     EDITING_AMOUNT,
     EDITING_TEXT,
-    WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
-    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
     WAITING_BULK_CONFIRM,
-) = range(21)
+) = range(19)
 
 DB_PATH = None  # Set from config at runtime
 LOCAL_CHART_PATH = "./charts"
@@ -42,7 +40,7 @@ markup = ReplyKeyboardMarkup(
 
 # Input type menu
 input_type_keyboard = ReplyKeyboardMarkup(
-    [["📝 Manual", "📷 Foto", "💬 Teks"]],
+    [["📝 Manual", "📷 Foto"]],
     one_time_keyboard=True,
     resize_keyboard=True,
 )

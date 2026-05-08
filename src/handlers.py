@@ -23,7 +23,6 @@ from constants import (
     EDITING_AMOUNT,
     EDITING_TEXT,
     WAITING_MANUAL_CONFIRM,
-    WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
     QUICK_ADD_CONFIRM,
@@ -82,11 +81,6 @@ async def handle_input_type(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     choice = update.message.text
     if choice == "📝 Manual":
         return await ask_category(update, context)
-    elif choice == "💬 Teks":
-        await update.message.reply_text(
-            "Ketik pengeluaran, contoh: 'Makan siang 50k di Indomaret'"
-        )
-        return WAITING_TEXT
     elif choice == "📷 Foto":
         await update.message.reply_text("Kirim foto struk:")
         return WAITING_PHOTO
@@ -220,78 +214,6 @@ async def handle_photo_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.error(f"Photo confirm error: {e}")
         await update.message.reply_text(f"Gagal menyimpan: {e}", reply_markup=markup)
 
-    return CHOOSING
-
-
-async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text.strip()
-    parsed = _parse_amount(text)
-    if parsed is None:
-        await update.message.reply_text(
-            "Tidak bisa menemukan jumlah. Coba format: 'Makan 50k', 'Rp 50.000', '100000'",
-            reply_markup=markup,
-        )
-        return CHOOSING
-
-    category = _match_category(text)
-    context.user_data["text_amount"] = parsed
-    context.user_data["text_category"] = category
-    context.user_data["text_description"] = text
-
-    await update.message.reply_text(
-        "Masukkan tanggal transaksi (YYYY-MM-DD), kosongkan untuk hari ini:"
-    )
-    return CHOOSING_DATE
-
-
-async def handle_text_input_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text.strip().lower()
-
-    if text == "cancel" or text == "/cancel":
-        context.user_data.clear()
-        await update.message.reply_text("Dibatalkan.", reply_markup=markup)
-        return CHOOSING
-
-    amount = context.user_data.get("text_amount")
-    category = context.user_data.get("text_category", "Other")
-    description = context.user_data.get("text_description", "")
-
-    if text != "ya":
-        parsed = _parse_amount(text)
-        if parsed is not None:
-            amount = parsed
-        else:
-            try:
-                amount = float(text.replace(".", "").replace(",", "."))
-            except ValueError:
-                await update.message.reply_text("Jumlah tidak valid. Coba lagi.", reply_markup=markup)
-                return CHOOSING
-
-    user_id = str(update.effective_user.id)
-    expense_id = save_expense(
-        user_id=user_id,
-        amount=amount,
-        category=category,
-        description=description,
-        merchant=None,
-        date=datetime.datetime.now().strftime("%Y-%m-%d"),
-        source="text",
-    )
-
-    update_spent(category)
-    await check_budget(category)
-
-    await update.message.reply_text(
-        f"<b>Tercatat ✅</b>\n\n"
-        f"<b>Kategori:</b> {category}\n"
-        f"<b>Jumlah:</b> Rp {amount:,.0f}\n"
-        f"<b>Catatan:</b> {description}\n"
-        f"<b>ID:</b> {expense_id}",
-        parse_mode="HTML",
-        reply_markup=markup,
-    )
-
-    context.user_data.clear()
     return CHOOSING
 
 

@@ -15,10 +15,8 @@ from constants import (
     EDITING_AMOUNT,
     EDITING_TEXT,
     WAITING_MANUAL_CONFIRM,
-    WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
-    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
     WAITING_BULK_CONFIRM,
 )
@@ -48,7 +46,6 @@ from handlers import (
     handle_quick_add,
     handle_quick_add_confirm,
     handle_settings_choice,
-    handle_text_input,
     handle_undo_delete,
     handle_unexpected_message,
     help_command,
@@ -96,7 +93,6 @@ def main() -> None:
                 CommandHandler("start", start),
                 MessageHandler(filters.Regex("^📝 Manual$"), ask_category),
                 MessageHandler(filters.Regex("^📷 Foto$"), handle_input_type),
-                MessageHandler(filters.Regex("^💬 Teks$"), handle_input_type),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_message),
             ],
             CHOOSING_CATEGORY: [
@@ -116,10 +112,6 @@ def main() -> None:
                 CommandHandler("start", start),
                 CommandHandler("cancel", fallback),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_manual_confirm),
-            ],
-            WAITING_TEXT: [
-                CommandHandler("start", start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input),
             ],
             WAITING_PHOTO: [
                 CommandHandler("start", start),
