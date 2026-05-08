@@ -18,7 +18,9 @@ from constants import (
     WAITING_TEXT,
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
+    WAITING_TEXT_CONFIRM,
     QUICK_ADD_CONFIRM,
+    WAITING_BULK_CONFIRM,
 )
 from handlers import (
     ask_budget,
@@ -59,6 +61,8 @@ from handlers import (
     show_trend_chart,
     show_yearly_chart,
     start,
+    handle_bulk_input,
+    handle_bulk_confirm,
 )
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ConversationHandler, MessageHandler, filters
@@ -137,6 +141,11 @@ def main() -> None:
             QUICK_ADD_CONFIRM: [
                 CommandHandler("start", start),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quick_add_confirm),
+            ],
+            WAITING_BULK_CONFIRM: [
+                CommandHandler("start", start),
+                CommandHandler("cancel", fallback),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_bulk_confirm),
             ],
             CHOOSING_CHART: [
                 CommandHandler("start", start),

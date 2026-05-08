@@ -27,6 +27,7 @@ from constants import (
     WAITING_PHOTO,
     WAITING_PHOTO_CONFIRM,
     QUICK_ADD_CONFIRM,
+    WAITING_BULK_CONFIRM,
     markup,
     input_type_keyboard,
 )
@@ -290,6 +291,164 @@ async def handle_text_input_confirm(update: Update, context: ContextTypes.DEFAUL
         reply_markup=markup,
     )
 
+    context.user_data.clear()
+    return CHOOSING
+
+
+def _parse_line_date(text: str) -> str | None:
+    """Parse date from a single line of text. Returns YYYY-MM-DD or None."""
+    # Format: YYYY-MM-DD
+    m = re.search(r'(\d{4}-\d{2}-\d{2})', text)
+    if m:
+        try:
+            datetime.datetime.strptime(m.group(1), "%Y-%m-%d")
+            return m.group(1)
+        except ValueError:
+            pass
+
+    # Format: DD-MM-YYYY or DD/MM/YYYY
+    m = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', text)
+    if m:
+        try:
+            dt = datetime.datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    # Format: "10 mei 2026", "10 May 2026"
+    bulan_map = {
+        "januari": 1, "jan": 1, "februari": 2, "feb": 2,
+        "maret": 3, "mar": 3, "april": 4, "apr": 4,
+        "mei": 5, "juni": 6, "jun": 6,
+        "juli": 7, "jul": 7, "agustus": 8, "agu": 8,
+        "september": 9, "sep": 9, "oktober": 10, "okt": 10,
+        "november": 11, "nov": 11, "desember": 12, "des": 12,
+        "may": 5,
+    }
+    m = re.search(r'(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})', text)
+    if m:
+        month = bulan_map.get(m.group(2).lower())
+        if month:
+            try:
+                dt = datetime.datetime(int(m.group(3)), month, int(m.group(1)))
+                return dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+
+    return None
+
+
+def parse_bulk_lines(text: str) -> list[dict]:
+    """Parse multi-line expense input. Returns list of parsed line dicts."""
+    lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    results = []
+    for line in lines:
+        amount = _parse_amount(line)
+        if amount is not None:
+            date = _parse_line_date(line) or today
+            results.append({
+                "line": line,
+                "amount": amount,
+                "category": _match_category(line),
+                "merchant": _detect_merchant(line),
+                "date": date,
+            })
+        else:
+            results.append({"line": line, "error": "Jumlah tidak ditemukan"})
+    return results
+
+
+async def handle_bulk_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Parse multi-line input and show preview before saving."""
+    text = update.message.text.strip()
+    parsed = parse_bulk_lines(text)
+
+    # Limit check
+    if len(parsed) > 20:
+        parsed = parsed[:20]
+        await update.message.reply_text("Maks 20 baris. Sisanya dipotong.")
+
+    ok = [r for r in parsed if "error" not in r]
+    errors = [r for r in parsed if "error" in r]
+
+    if not ok:
+        await update.message.reply_text(
+            "Tidak ada pengeluaran yang bisa diproses. Pastikan setiap baris ada jumlah.",
+            reply_markup=markup,
+        )
+        return CHOOSING
+
+    context.user_data["bulk_parsed"] = ok
+    context.user_data["bulk_errors"] = errors
+
+    # Build preview
+    msg = f"<b>Preview {len(ok)} pengeluaran:</b>\n\n"
+    for i, item in enumerate(ok, 1):
+        m = f" @ {item['merchant']}" if item['merchant'] else ""
+        msg += f"{i}. {item['category']}: Rp {item['amount']:,.0f}{m}\n"
+        msg += f"   <i>{item['line']}</i>\n"
+        msg += f"   📅 {item['date']}\n"
+    total = sum(item['amount'] for item in ok)
+    msg += f"\n<b>Total: Rp {total:,.0f}</b>"
+
+    if errors:
+        msg += f"\n\n⚠️ {len(errors)} baris dilewati:\n"
+        for e in errors:
+            msg += f"  <i>{e['line']}</i> — {e['error']}\n"
+
+    msg += "\n\nKetik <b>ya</b> untuk simpan, <b>cancel</b> untuk batal."
+    await update.message.reply_text(msg, parse_mode="HTML")
+    return WAITING_BULK_CONFIRM
+
+
+async def handle_bulk_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Save bulk expenses after user confirms."""
+    text = update.message.text.strip().lower()
+
+    if text == "cancel" or text == "/cancel":
+        context.user_data.clear()
+        await update.message.reply_text("Dibatalkan.", reply_markup=markup)
+        return CHOOSING
+
+    if text != "ya":
+        await update.message.reply_text(
+            "Ketik <b>ya</b> untuk simpan semua, atau <b>cancel</b> untuk batal.",
+            parse_mode="HTML",
+        )
+        return WAITING_BULK_CONFIRM
+
+    parsed = context.user_data.get("bulk_parsed", [])
+    if not parsed:
+        await update.message.reply_text("Data tidak ditemukan. Ulangi.", reply_markup=markup)
+        return CHOOSING
+
+    user_id = str(update.effective_user.id)
+    saved = []
+    for item in parsed:
+        expense_id = save_expense(
+            user_id=user_id, amount=item["amount"],
+            category=item["category"], description=item["line"],
+            merchant=item["merchant"], date=item["date"], source="bulk",
+        )
+        saved.append({**item, "id": expense_id})
+
+    # Budget recalculation
+    categories_touched = {item["category"] for item in saved}
+    for cat in categories_touched:
+        update_spent(cat)
+    for cat in categories_touched:
+        await check_budget(cat)
+
+    total = sum(item["amount"] for item in saved)
+    msg = f"<b>Tercatat {len(saved)} pengeluaran ✅</b>\n\n"
+    for item in saved:
+        m = f" @ {item['merchant']}" if item['merchant'] else ""
+        msg += f"  {item['category']}: Rp {item['amount']:,.0f}{m}\n"
+        msg += f"    📅 {item['date']}\n"
+    msg += f"\n<b>Total: Rp {total:,.0f}</b>"
+
+    await update.message.reply_text(msg, parse_mode="HTML", reply_markup=markup)
     context.user_data.clear()
     return CHOOSING
 
@@ -1094,6 +1253,11 @@ async def handle_unexpected_message(update: Update, context: ContextTypes.DEFAUL
 # --- Quick Add (direct text input from main menu) ---
 async def handle_quick_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
+
+    # Multi-line → bulk flow
+    if '\n' in text:
+        return await handle_bulk_input(update, context)
+
     amount = _parse_amount(text)
     if amount is None:
         await update.message.reply_text("Huh?", reply_markup=markup)
