@@ -1,13 +1,25 @@
-credentials.json
-venv/
+# Secrets
 .env
-__pycache__
-release/
-charts/
-settings.json
-spreadsheets/venv_ocr/
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+venv_ocr/
+
+# Runtime data
 *.db
-spreadsheets/
+settings.json
 receipts/
 charts/
-settings.json
+spreadsheets/
+release/
+
+#agent files
+.pi/
+CLAUDE.md
+plan-maintenance.md
+plan-from-calude.md
