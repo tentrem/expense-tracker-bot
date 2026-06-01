@@ -4,95 +4,66 @@ Telegram bot untuk tracking pengeluaran keluarga secara bersama (group chat).
 
 ## Fitur
 
-- **Manual input**: Pilih kategori → input jumlah
-- **Text input**: Ketik "Makan siang 50k di Indomaret" → auto parse amount + category
+- **Manual input**: `Tambah` → pilih kategori → isi deskripsi/jumlah → pilih tanggal → konfirmasi
+- **Quick-add text**: Ketik dari menu utama seperti `Makan siang 50k di Indomaret` → auto parse amount + category
+- **Bulk multi-line input**: Paste beberapa baris sekaligus dari menu utama → preview → konfirmasi batch
 - **Photo OCR**: Kirim foto struk → Tesseract OCR → auto extract amount + category
 - **Riwayat**: Summary pengeluaran per bulan (semua anggota keluarga)
-- **Grafik**: Pie, Histogram, Trend, Heatmap
+- **Grafik**: Pie, Histogram, Trend, Heatmap untuk 3 bulan terakhir
 - **Edit**: Edit amount, category, description, merchant, date
-- **Hapus**: Soft delete (is_deleted=1)
+- **Hapus**: Soft delete (`is_deleted=1`) + undo
 - **Anggaran**: Set budget per kategori (shared), notifikasi saat melebihi batas
-- **Export**: Download .xlsx
+- **Export**: Download `.xlsx`
 - **Multi-user**: Allowlist di `.env`, data shared di group chat
 
 ## Application Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Telegram Group Chat                                            │
-│                                                                 │
-│  User → /start                                                  │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌─────────────────┐                                            │
-│  │  Allowlist Check│ ─── not in list → "Kamu tidak berhak"      │
-│  │ (config.py)     │ ─── in list → show menu                    │
-│  └────────────────┘                                            │
-│           ▼                                                     │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Main Menu (constants.py:reply_keyboard)                 │  │
-│  │  ✏️ Tambah  ❌ Hapus  📊 Grafik                          │  │
-│  │  📋 Riwayat  💰 Anggaran  📤 Export   Edit             │  │
-│  └──────┬───────────────────────────────────────────────────┘  │
-│         │                                                      │
-│  ┌──────┴────────────────────────────────────────────────────┐ │
-│  │  ConversationHandler (main.py) — 16 states                 │ │
-│  │                                                            │ │
-│  │  Tambah → Input Type Selection                             │ │
-│  │  │                                                        │ │
-│  │  ├─ Manual  → Pilih Kategori → Input Jumlah               │ │
-│  │  │   → handlers.py::save_on_local_db()                    │ │
-│  │  │                                                        │ │
-│  │  ├─ Teks    → Ketik "Makan 50k di Indomaret"             │ │
-│  │  │   → handlers.py::handle_text_input()                   │ │
-│  │  │   → _parse_amount()  (regex: 50k→50000, 1.5jt→1500000)│ │
-│  │  │   → _match_category()  (keyword matching, 10 kategori) │ │
-│  │  │                                                        │ │
-│  │  └─ Foto    → Kirim struk                                 │ │
-│  │      → handlers.py::handle_photo()                        │ │
-│  │      → ocr_handler.py::run_ocr() (Tesseract, Python 3.11) │ │
-│  │      → _parse_amount() + _match_category()                │ │
-│  │      → Konfirmasi → save_expense()                        │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────── │
-│  │  utils.py — Data Layer (SQLite)                            │ │
-│  │                                                            │ │
-│  │  save_expense()    → INSERT INTO expenses (audit user_id)  │ │
-│  │  get_expenses()    → SELECT ... WHERE is_deleted=0         │ │
-│  │  delete_expense()  → UPDATE is_deleted=1 (soft delete)     │ │
-│  │  update_expense()  → UPDATE amount/category/etc            │ │
-│  │  set_budget()      → INSERT/UPDATE budgets (shared)        │ │
-│  │  update_spent()    → Recalculate from expenses table       │ │
-│  │  check_budget()    → Notify if spent > budget              │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  charts.py — Grafik                                        │ │
-│  │  pandas + matplotlib → PNG → send_photo()                  │ │
-│  │  Pie, Histogram, Trend, Heatmap                            │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  export.py — Export                                        │ │
-│  │  pandas → .xlsx → send_document()                          │ │
-│  └──────────────────────────────────────────────────────────── │
-└─────────────────────────────────────────────────────────────────┘
+```text
+/start → Allowlist check → Main menu
+
+Main menu:
+- ✏️ Tambah
+- ❌ Hapus
+- 📊 Grafik
+- 📋 Riwayat
+- 💰 Anggaran
+- 📤 Export
+- 📝 Edit
+- ⚙️ Pengaturan
+
+Tambah:
+- 📝 Manual → pilih kategori → isi deskripsi/jumlah → pilih tanggal → konfirmasi → simpan
+- 📷 Foto → kirim struk → OCR → parse → konfirmasi → simpan
+
+Quick-add dari menu utama:
+- single-line text → parse amount + category + merchant → konfirmasi → simpan
+- multi-line text → parse semua baris → preview batch → konfirmasi → simpan banyak expense
+
+Lainnya:
+- ❌ Hapus → soft delete + undo
+- 📊 Grafik → Pie / Histogram / Trend / Heatmap (3 bulan terakhir)
+- 📋 Riwayat → monthly summary text
+- 💰 Anggaran → Set / Show
+- 📤 Export → file `.xlsx`
+- 📝 Edit → pilih expense → pilih field → update
+- ⚙️ Pengaturan → Google Sheets sync, budget notifications
+- /cancel → reset flow dengan aman
 ```
 
 ## Architecture
 
 ```
 Telegram Bot (python-telegram-bot v21.1.1)
-├─ main.py          — Entry point, ConversationHandler (16 states)
-├─ handlers.py      — Async handlers (UI flow, amount/category parsing)
-─ utils.py         — SQLite helpers, budget, settings
+├─ main.py          — Entry point, ConversationHandler (19 states)
+├─ handlers.py      — Async handlers (UI flow, quick-add, bulk input, parsing)
+├─ utils.py         — SQLite helpers, budget, settings
 ├─ ocr_handler.py   — Tesseract OCR (subprocess, Python 3.11 venv)
 ├─ charts.py        — matplotlib charts (Pie, Histogram, Trend, Heatmap)
 ├─ export.py        — pandas → .xlsx export
 ├─ config.py        — Env vars, DB_PATH, allowlist
 ├─ constants.py     — States, categories, keyboard layout
-└─ requirements.txt
+├─ requirements.txt
+└─ requirements-ocr.txt
 ```
 
 ## Data Storage
@@ -125,14 +96,41 @@ budgets (
 
 ## Setup
 
+### 1. Main app
+
 ```bash
 cd ~/Projects/expense-tracker/bot
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
 # Config
 cp .env.example .env
 # Edit .env: add TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_USERS
+```
 
-# Run
+### 2. OCR environment
+
+`src/ocr_handler.py` runs OCR via separate Python 3.11 env at `venv_ocr/`.
+
+Install system Tesseract first, then create OCR env:
+
+```bash
+python3.11 -m venv venv_ocr
+source venv_ocr/bin/activate
+pip install -r requirements-ocr.txt
+```
+
+Make sure `tesseract` binary is available in PATH, or installed in one of these common paths used by `ocr_handler.py`:
+- `/home/linuxbrew/.linuxbrew/bin/tesseract`
+- `/opt/homebrew/bin/tesseract`
+- `/usr/bin/tesseract`
+
+### 3. Run bot
+
+```bash
+source venv/bin/activate
 PYTHONPATH=src python3 src/main.py
 ```
 
@@ -156,4 +154,8 @@ PYTHONPATH=src python3 src/main.py
 - **Shared expense**: Semua anggota keluarga lihat semua expense (Riwayat, Charts, Export)
 - **Allowlist**: Hanya user di `TELEGRAM_ALLOWED_USERS` yang bisa `/start`
 - **OCR**: Tesseract via subprocess (Python 3.11 venv di `venv_ocr/`)
+- **`venv_ocr/` is not committed**: create it locally with `requirements-ocr.txt`
+- **Quick-add**: text input langsung dari menu utama, tidak ada menu `Teks` terpisah
+- **Bulk input**: multi-line text dari menu utama diproses sebagai batch
+- **Charts**: filter otomatis 3 bulan terakhir; file PNG dibersihkan setelah dikirim
 - **Group chat**: BotFather `/setprivacy` → Disable agar bot baca semua message
